@@ -35,8 +35,7 @@ dns_timeweb_add() {
   _debug _domain "$_domain"
 
   _info "Adding record"
-  if _timeweb_rest POST "domains/$_domain/dns-records" "{\"subdomain\":\"$_sub_domain.$_domain\",\"type\":\"TXT\",\"value\":\"$txtvalue\"}"; then
-    _debug2 response "$response"
+  if _timeweb_rest POST "domains/$_domain/dns-records" "{\"subdomain\":\"$_sub_domain\",\"type\":\"TXT\",\"value\":\"$txtvalue\"}"; then
     if _contains "$response" "$txtvalue"; then
       _info "Added, OK"
       return 0
@@ -57,12 +56,46 @@ dns_timeweb_add() {
 dns_timeweb_rm() {
   fulldomain=$1
   txtvalue=$2
-  _info "Using timeweb"
+
+  _info "Using Timeweb"
   _debug fulldomain "$fulldomain"
   _debug txtvalue "$txtvalue"
 
-  _err "Not implemented yet!"
-  return 1  
+  Timeweb_Token="${Timeweb_Token:-$(_readaccountconf_mutable Timeweb_Token)}"
+
+  if [ "$Timeweb_Token" ]; then
+    _saveaccountconf_mutable Timeweb_Token "$Timeweb_Token"
+  else
+    _err "You didn't specify a Timeweb api key yet."
+    _err "You can get yours from here https://timeweb.cloud/my/api-keys/create."
+    return 1
+  fi
+
+  _debug "First detect the root zone"
+  if ! _get_root "$fulldomain"; then
+    _err "invalid domain"
+    return 1
+  fi
+  _debug _sub_domain "$_sub_domain"
+  _debug _domain "$_domain"
+
+  _timeweb_rest GET "domains/$_domain/dns-records" ""
+  if _contains "$response" "\"dns_records\":"; then
+    _records=$(echo "$response" | _egrep_o "\"dns_records\": *\[[^]]*]" | sed -E 's/"dns_records":\[//' | sed -E 's/\]//')
+    _record=$(echo "$_records" | _egrep_o "{\"data\":{\"subdomain\":\"_acme-challenge\",\"value\":\"$txtvalue\"},\"id\":([0123456789]+),\"type\":\"TXT\",\"fqdn\":\"$_domain\"}")
+    _id=$(echo "$_record" | _egrep_o "\"id\": *[0123456789]+" | cut -d : -f 2)
+    _debug2 records "$_records"
+    _debug2 record "$_record"
+    _debug2 id "$_id"
+ 
+    if _timeweb_rest DELETE "domains/$_domain/dns-records/$_id" ""; then
+      _info "Removed, OK"
+      return 0
+    fi 
+  fi
+  _err "Remove txt record error."
+  return 1
+
 }
 
 ####################  Private functions below ##################################
@@ -116,7 +149,7 @@ _timeweb_rest() {
   else
     response="$(_get "$Timeweb_Api/$ep")"
   fi
-  
+
   if [ "$?" != "0" ]; then
     _err "error $ep"
     return 1
