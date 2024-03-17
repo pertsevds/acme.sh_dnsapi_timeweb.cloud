@@ -39,7 +39,7 @@ dns_timeweb_add() {
     if _contains "$response" "$txtvalue"; then
       _info "Added, OK"
       return 0
-    elif _contains "$response" "The record already exists"; then
+    elif _contains "$response" "dns_record_exists"; then
       _info "Already exists, OK"
       return 0
     else
