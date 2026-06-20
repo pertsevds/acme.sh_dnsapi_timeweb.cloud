@@ -82,16 +82,16 @@ dns_timeweb_rm() {
   _timeweb_rest GET "domains/$_domain/dns-records" ""
   if _contains "$response" "\"dns_records\":"; then
     _records=$(echo "$response" | _egrep_o "\"dns_records\": *\[[^]]*]" | sed -E 's/"dns_records":\[//' | sed -E 's/\]//')
-    _record=$(echo "$_records" | _egrep_o "{\"data\":{\"subdomain\":\"_acme-challenge\",\"value\":\"$txtvalue\"},\"id\":([0123456789]+),\"type\":\"TXT\",\"fqdn\":\"$_domain\"}")
+    _record=$(echo "$_records" | _egrep_o "{\"data\":{\"subdomain\":\"$_sub_domain\",\"value\":\"$txtvalue\"},\"id\":([0123456789]+),\"type\":\"TXT\",\"fqdn\":\"$_domain\"}")
     _id=$(echo "$_record" | _egrep_o "\"id\": *[0123456789]+" | cut -d : -f 2)
     _debug2 records "$_records"
     _debug2 record "$_record"
     _debug2 id "$_id"
- 
+
     if _timeweb_rest DELETE "domains/$_domain/dns-records/$_id" ""; then
       _info "Removed, OK"
       return 0
-    fi 
+    fi
   fi
   _err "Remove txt record error."
   return 1
@@ -121,7 +121,7 @@ _get_root() {
     if _contains "$response" "\"domain\":"; then
       _domain=$(echo "$response" | sed -E 's/,"subdomains":.+//' | _egrep_o "\"fqdn\": *\"[^\"]*\"" | cut -d : -f 2 | tr -d \" | tr -d " ")
       if [ "$_domain" ]; then
-        _sub_domain=$(printf "%s" "$domain" | cut -d . -f 1-"$p")
+        _sub_domain="${domain%.$_domain}"
         return 0
       fi
       return 1
